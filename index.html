@@ -107,14 +107,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',s
         <div class="modal">
             <h2>🔑 软件激活</h2>
             <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
-                一机一码激活，永久使用。<br>
-                请将您的<b>机器码</b>发送给管理员获取激活码。
+                严格一机一码，激活码绑定本设备。<br>
+                请将<b>机器码</b>发送给管理员获取专属激活码。<br>
+                <span style="color:var(--danger);font-size:11px">⚠ 不同电脑的激活码不可共用</span>
             </p>
             <div style="background:var(--tag-bg);padding:12px;border-radius:8px;margin:8px 0;text-align:center">
-                <span style="font-size:12px;color:var(--text2)">您的机器码：</span><br>
+                <span style="font-size:12px;color:var(--text2)">本机唯一机器码：</span><br>
                 <strong id="machineCode" style="font-size:20px;color:var(--primary);font-family:monospace;letter-spacing:2px">-</strong>
             </div>
-            <input type="text" id="activationInput" placeholder="请输入激活码 HNJZ-XXXX-XXXX-XXXX" maxlength="32" autocomplete="off">
+            <input type="text" id="activationInput" placeholder="输入专属激活码 HNJZ-XXXX-XXXX-XXXX" maxlength="32" autocomplete="off">
             <div style="display:flex;gap:8px;margin-top:12px">
                 <button class="btn btn-primary" onclick="activate()">✅ 激活</button>
                 <button class="btn btn-outline" onclick="closeActivation()">取消</button>
@@ -285,28 +286,27 @@ const S = {
 };
 
 // ==================== ACTIVATION ====================
-function genMachineCode() {
-    const c = [
-        navigator.hardwareConcurrency || 4,
-        navigator.deviceMemory || 4,
-        screen.colorDepth,
-        screen.width + 'x' + screen.height,
-        new Date().getTimezoneOffset(),
-        navigator.language,
-    ];
-    let h = 0;
-    const s = c.join('|');
-    for (let i = 0; i < s.length; i++) {
-        h = ((h << 5) - h) + s.charCodeAt(i);
-        h |= 0;
+// Device ID: random 16-char hex per browser, stored in localStorage
+// Truly unique per machine
+function getDeviceId() {
+    let id = localStorage.getItem('hnsafety_device_id');
+    if (!id) {
+        // Generate random 16-char hex string
+        const arr = new Uint8Array(8);
+        crypto.getRandomValues(arr);
+        id = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        localStorage.setItem('hnsafety_device_id', id);
     }
-    return Math.abs(h).toString(16).toUpperCase().substring(0, 12).padStart(12, '0');
+    return id;
 }
 
-function genValidCode(mc) {
-    let seed = parseInt(mc, 16);
-    if (isNaN(seed)) seed = 0;
-    for (let i = 0; i < mc.length; i++) seed = ((seed << 5) - seed) + mc.charCodeAt(i);
+// Generate activation code from 16-char device ID
+function genValidCode(deviceId) {
+    let seed = 0;
+    for (let i = 0; i < deviceId.length; i++) {
+        seed = ((seed << 5) - seed) + deviceId.charCodeAt(i);
+        seed |= 0;
+    }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     seed = Math.abs(seed);
@@ -318,27 +318,36 @@ function genValidCode(mc) {
     return 'HNJZ-' + code.substring(5);
 }
 
-function validateCode(input, mc) {
+function validateCode(input, deviceId) {
     const clean = input.toUpperCase().replace(/\s/g, '');
-    if (['HNJZ-ADMIN-MASTER-KEY1','HNJZ-2024-SAFETY-EXAM'].includes(clean)) return true;
-    return clean === genValidCode(mc);
+    return clean === genValidCode(deviceId);
 }
 
 function checkActivation() {
     try {
         const d = JSON.parse(localStorage.getItem('hnsafety_act') || '{}');
-        if (d.mc === genMachineCode() && d.ok) { S.activated = true; S.machineCode = d.mc; return true; }
+        const devId = getDeviceId();
+        if (d.deviceId === devId && d.ok) {
+            S.activated = true;
+            S.machineCode = devId;
+            return true;
+        }
     } catch(e) {}
     return false;
 }
 
 function saveActivation() {
-    localStorage.setItem('hnsafety_act', JSON.stringify({ ok: true, mc: S.machineCode, ts: Date.now() }));
+    localStorage.setItem('hnsafety_act', JSON.stringify({
+        ok: true,
+        deviceId: S.machineCode,
+        ts: Date.now()
+    }));
 }
 
 function showActivation() {
     document.getElementById('activationModal').classList.remove('hidden');
-    document.getElementById('machineCode').textContent = genMachineCode();
+    const devId = getDeviceId();
+    document.getElementById('machineCode').textContent = devId;
     document.getElementById('activationMsg').innerHTML = '';
     document.getElementById('activationInput').value = '';
     document.getElementById('activationInput').focus();
@@ -350,15 +359,15 @@ function closeActivation() {
 
 function activate() {
     const input = document.getElementById('activationInput').value.trim();
-    const mc = genMachineCode();
+    const devId = getDeviceId();
     if (!input) { document.getElementById('activationMsg').innerHTML = '<span style="color:var(--danger)">请输入激活码</span>'; return; }
-    if (validateCode(input, mc)) {
-        S.activated = true; S.machineCode = mc; saveActivation();
+    if (validateCode(input, devId)) {
+        S.activated = true; S.machineCode = devId; saveActivation();
         document.getElementById('activationMsg').innerHTML = '<span style="color:var(--success)">✅ 激活成功！正在加载...</span>';
         document.getElementById('activationStatus').textContent = '✅ 已激活';
         setTimeout(() => { closeActivation(); initApp(); }, 300);
     } else {
-        document.getElementById('activationMsg').innerHTML = '<span style="color:var(--danger)">❌ 激活码无效！请确认机器码并联系管理员获取正确的激活码。</span>';
+        document.getElementById('activationMsg').innerHTML = '<span style="color:var(--danger)">❌ 激活码无效！<br>请将机器码发送给管理员获取激活码。<br>每台电脑的激活码唯一，不可共用。</span>';
     }
 }
 
@@ -763,7 +772,7 @@ function initApp() {
 
 // Init on page load
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('machineCode').textContent = genMachineCode();
+    document.getElementById('machineCode').textContent = getDeviceId();
     if (checkActivation()) {
         document.getElementById('activationStatus').textContent = '✅ 已激活';
         initApp();
