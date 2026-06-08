@@ -117,7 +117,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC'
     <div class="header-actions">
         <span style="font-size:11px;color:var(--text2)" id="activationStatus">🔒 未激活</span>
         <button class="btn btn-sm btn-outline" onclick="toggleTheme()"><span id="themeIcon">☀️</span> <span id="themeLabel">浅色</span></button>
-        <button class="btn btn-sm btn-outline" onclick="showActivation()">🔑 激活</button>
+        <button class="btn btn-sm btn-outline hidden" onclick="showActivation()">🔑 激活</button>
     </div>
 </div>
 
@@ -321,7 +321,7 @@ function toggleTheme(){const cur=document.documentElement.getAttribute('data-the
 (function(){const saved=localStorage.getItem('hnsafety_theme');if(saved)document.documentElement.setAttribute('data-theme',saved);const icons={'':'☀️','dark':'🌙','eye':'🌿'};const labels={'':'浅色','dark':'深色','eye':'护眼'};const cur=document.documentElement.getAttribute('data-theme')||'';document.getElementById('themeIcon').textContent=icons[cur]||'☀️';document.getElementById('themeLabel').textContent=labels[cur]||'浅色';})();
 document.addEventListener('keydown',function(e){if(document.getElementById('activationModal').classList.contains('hidden')===false)return;if(S.exam.active){if(e.key==='ArrowLeft'){e.preventDefault();examPrev();}if(e.key==='ArrowRight'){e.preventDefault();examNext();}const n=parseInt(e.key);if(n>=1&&n<=5){e.preventDefault();selectExamOpt(n-1);}return;}if(S.mode==='practice'){if(S.answerState!=='answered'){const n=parseInt(e.key);if(n>=1&&n<=5){e.preventDefault();selectOption(n-1);}if(e.key==='Enter'){e.preventDefault();submitAnswer();}}if(e.key==='ArrowRight'){e.preventDefault();nextQuestion();}if(e.key==='ArrowLeft'){e.preventDefault();prevQuestion();}}});
 function initApp(){mergeQuestions();loadData();document.getElementById('loadingView').classList.add('hidden');document.getElementById('mainContent').classList.remove('hidden');switchCategory('ALL');switchMode('practice');}
-document.addEventListener('DOMContentLoaded',function(){document.getElementById('machineCode').textContent=getDeviceId();if(checkActivation()){document.getElementById('activationStatus').textContent='✅ 已激活';initApp();}else{document.getElementById('loadingView').classList.add('hidden');document.getElementById('mainContent').classList.add('hidden');showActivation();}});
+document.addEventListener('DOMContentLoaded',function(){document.getElementById('activationStatus').textContent='';S.activated=true;initApp();});
 </script>
 <script src="questions_A.js"></script>
 <script src="questions_B.js"></script>
