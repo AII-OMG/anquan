@@ -289,9 +289,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC'
 let ALL_QUESTIONS=[];
 function mergeQuestions(){const cats=['A','B','C1','C2','C3'];for(const cat of cats){const qs=window['QUESTIONS_'+cat];if(qs&&Array.isArray(qs))ALL_QUESTIONS.push(...qs);}}
 const S={activated:false,machineCode:'',questions:[],filtered:[],currentIdx:0,mode:'practice',category:'ALL',typeFilter:'all',answerState:null,selectedOpts:[],wrongBook:{},favorites:{},progress:{},exam:{active:false,questions:[],answers:{},idx:0,timer:null,timeLeft:0,totalTime:0},searchQuery:'',questionHistory:{}};
-const QK=q=>QK(q);
-const TC=q=>TC(q);
-function RS(){RS();}
+const QK=q=>q.id||q.stem.substring(0,60);
+const TC=q=>q.type==='判断'?'judge':q.type==='单选'?'single':'multi';
+function RS(){S.answerState=null;S.selectedOpts=[];}
 const E={};function CACHE(){['questionContent','questionNav','submitBtn','nextBtn','prevBtn','wrongBookBtn','answerFeedback','examProgress','examTimer','examAnswerGrid','miniStats','favList','favEmpty','wrongList','wrongEmpty','statsCards','categoryProgress'].forEach(id=>E[id]=document.getElementById(id));}
 let searchTO;
 function getDeviceId(){let id=localStorage.getItem('hnsafety_device_id');if(!id){const arr=new Uint8Array(8);crypto.getRandomValues(arr);id=Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();localStorage.setItem('hnsafety_device_id',id);}return id;}
