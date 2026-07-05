@@ -106,6 +106,9 @@ body::before{content:'';position:fixed;inset:0;background:var(--glow);pointer-ev
 .load-banner .mini-spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
 .load-banner.error{background:rgba(255,59,48,.08);color:var(--danger);cursor:pointer}
 .load-banner.error .mini-spinner{display:none}
+.load-banner.error .load-bar{display:none}
+.load-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;min-width:50px}
+.load-bar i{display:block;height:100%;width:0;background:var(--primary);border-radius:2px;transition:width .2s}
 .footer-quote{text-align:center;font-size:12px;color:var(--text2);font-weight:500;margin:28px 0 4px;letter-spacing:.02em}
 .footer-note{text-align:center;font-size:11px;color:var(--text2);opacity:.55;margin:0 0 8px}
 .exam-opts{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin:16px 0}
@@ -209,7 +212,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--glow);pointer-ev
             <span class="type-filter-btn type-filter-multi" data-type="多选" onclick="setTypeFilter('多选')">📋 多选题</span>
         </div>
 
-        <div class="load-banner hidden" id="loadBanner" onclick="retryLoads()"><span class="mini-spinner"></span><span id="loadBannerText">题库加载中…</span></div>
+        <div class="load-banner hidden" id="loadBanner" onclick="retryLoads()"><span class="mini-spinner"></span><span id="loadBannerText">题库加载中…</span><span class="load-bar"><i id="loadBannerFill"></i></span></div>
 
         <div class="stats-row" id="miniStats"></div>
 
@@ -334,13 +337,27 @@ const CAT_LIST=['A','B','C1','C2','C3'];
 const catPromises={};
 let loadFailed=false;
 const QDATA_VER='2';
-function loadCat(cat){if(catPromises[cat])return catPromises[cat];catPromises[cat]=fetch('questions_'+cat+'.json?v='+QDATA_VER).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();}).then(qs=>{if(!Array.isArray(qs))throw new Error('bad data');window['QUESTIONS_'+cat]=qs;ALL_QUESTIONS.push(...qs);return cat;}).catch(err=>{delete catPromises[cat];throw err;});return catPromises[cat];}
+const CAT_SIZES={A:3828667,B:5197269,C1:3872832,C2:4254984,C3:5197269};
+const CAT_PROG={};
+let bannerTS=0;
+function loadCat(cat){if(catPromises[cat])return catPromises[cat];
+if(cat==='C3'){catPromises.C3=loadCat('B').then(()=>{const qs=window.QUESTIONS_B.map(q=>Object.assign({},q,{category:'C3类',id:(q.id||'').replace(/^B_/,'C3_')}));window.QUESTIONS_C3=qs;ALL_QUESTIONS.push(...qs);return 'C3';}).catch(err=>{delete catPromises.C3;throw err;});return catPromises.C3;}
+catPromises[cat]=fetch('questions_'+cat+'.json?v='+QDATA_VER).then(r=>{
+if(!r.ok)throw new Error(r.status);
+if(!r.body)return r.json();
+const reader=r.body.getReader();const chunks=[];let recv=0;const total=CAT_SIZES[cat]||0;
+function step(){return reader.read().then(res=>{if(res.done)return;chunks.push(res.value);recv+=res.value.length;if(total){CAT_PROG[cat]=Math.min(recv/total,0.99);const now=Date.now();if(now-bannerTS>150){bannerTS=now;refreshLoadBanner();}}return step();});}
+return step().then(()=>{CAT_PROG[cat]=1;return new Blob(chunks).text();}).then(t=>JSON.parse(t));
+}).then(qs=>{if(!Array.isArray(qs))throw new Error('bad data');window['QUESTIONS_'+cat]=qs;ALL_QUESTIONS.push(...qs);return cat;}).catch(err=>{delete catPromises[cat];CAT_PROG[cat]=0;throw err;});
+return catPromises[cat];}
 function neededCats(cat){return cat==='ALL'?CAT_LIST:[cat];}
 function catsPending(){return neededCats(S.category).some(c=>!window['QUESTIONS_'+c]);}
-function refreshLoadBanner(){const banner=document.getElementById('loadBanner');const need=neededCats(S.category);const pending=need.filter(c=>!window['QUESTIONS_'+c]);if(loadFailed){banner.classList.remove('hidden');banner.classList.add('error');document.getElementById('loadBannerText').textContent='⚠️ 部分题库加载失败，点击此处重试';return;}if(!pending.length){banner.classList.add('hidden');return;}banner.classList.remove('hidden');banner.classList.remove('error');const done=need.length-pending.length;document.getElementById('loadBannerText').textContent=need.length>1?('题库加载中 '+done+'/'+need.length+'，已加载部分可直接刷题'):'题库加载中，请稍候…';}
+function refreshLoadBanner(){const banner=document.getElementById('loadBanner');const need=neededCats(S.category);const pending=need.filter(c=>!window['QUESTIONS_'+c]);if(loadFailed){banner.classList.remove('hidden');banner.classList.add('error');document.getElementById('loadBannerText').textContent='⚠️ 部分题库加载失败，点击此处重试';return;}if(!pending.length){banner.classList.add('hidden');return;}banner.classList.remove('hidden');banner.classList.remove('error');const catProg=c=>window['QUESTIONS_'+c]?1:(c==='C3'?(CAT_PROG.B||0):(CAT_PROG[c]||0));let done=0,tot=0;for(const c of need){const sz=CAT_SIZES[c]||1;tot+=sz;done+=sz*catProg(c);}const pct=Math.floor(done/tot*100);document.getElementById('loadBannerText').textContent=(need.length>1?('题库下载中 '+(need.length-pending.length)+'/'+need.length+' · '):'题库下载中 ')+pct+'%'+(need.length>1&&(need.length-pending.length)>0?'，已加载部分可先刷题':'');const fill=document.getElementById('loadBannerFill');if(fill)fill.style.width=pct+'%';}
 function retryLoads(){if(!loadFailed)return;loadFailed=false;startCatLoads(S.category);}
 function onCatLoaded(){S.questions=ALL_QUESTIONS;applyFilters();refreshLoadBanner();if(S.mode==='practice')renderPractice();else if(S.mode==='stats')renderStats();}
-function startCatLoads(cat){neededCats(cat).forEach(c=>{if(window['QUESTIONS_'+c])return;loadCat(c).then(onCatLoaded).catch(()=>{loadFailed=true;refreshLoadBanner();});});refreshLoadBanner();}
+const loadQueue=[];let loadingNow=0;
+function pumpLoads(){while(loadingNow<2&&loadQueue.length){const c=loadQueue.shift();if(window['QUESTIONS_'+c]||catPromises[c])continue;loadingNow++;loadCat(c).then(()=>{loadingNow--;onCatLoaded();pumpLoads();}).catch(()=>{loadingNow--;loadFailed=true;refreshLoadBanner();pumpLoads();});}}
+function startCatLoads(cat){const need=neededCats(cat).filter(c=>!window['QUESTIONS_'+c]&&!catPromises[c]);for(const c of[...need].reverse()){const i=loadQueue.indexOf(c);if(i>=0)loadQueue.splice(i,1);loadQueue.unshift(c);}pumpLoads();refreshLoadBanner();}
 const S={questions:[],filtered:[],currentIdx:0,mode:'practice',category:'ALL',typeFilter:'all',answerState:null,selectedOpts:[],wrongBook:{},favorites:{},progress:{},exam:{active:false,questions:[],answers:{},idx:0,timer:null,timeLeft:0,totalTime:0},searchQuery:'',questionHistory:{}};
 const QK=q=>q.id||q.stem.substring(0,60);
 const TC=q=>q.type==='判断'?'judge':q.type==='单选'?'single':'multi';

@@ -246,8 +246,10 @@ function build(q){
 }
 
 // ============ 三、标准JSON读写 ============
+// 注: C3 题库与 B 题库逐题一致(仅 category/id 前缀不同), 前端已改为运行时由 B 派生,
+// questions_C3.json 不再需要生成与部署。
 let ruleHit=0,topicHit=0,total=0;
-for(const cat of ['A','B','C1','C2','C3']){
+for(const cat of ['A','B','C1','C2']){
   const file=__dirname+'/questions_'+cat+'.json';
   const qs=JSON.parse(fs.readFileSync(file,'utf8'));
   for(const q of qs){
