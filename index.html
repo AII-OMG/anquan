@@ -355,7 +355,63 @@ function updateMiniStats(){const t=S.filtered.length;const cat=S.category==='ALL
 function switchCategory(cat){S.category=cat;localStorage.setItem('hnsafety_cat',cat);document.querySelectorAll('#categoryTabs .nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.cat===cat));startCatLoads(cat);applyFilters();S.currentIdx=0;RS();renderCurrentMode();}
 function switchMode(mode){S.mode=mode;document.querySelectorAll('#modeTabs .nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===mode));document.getElementById('practiceView').classList.toggle('hidden',mode!=='practice');document.getElementById('examView').classList.toggle('hidden',mode!=='exam');document.getElementById('favView').classList.toggle('hidden',mode!=='fav');document.getElementById('wrongView').classList.toggle('hidden',mode!=='wrong');document.getElementById('statsView').classList.toggle('hidden',mode!=='stats');renderCurrentMode();}
 function renderCurrentMode(){if(S.mode==='practice')renderPractice();if(S.mode==='fav')renderFavorites();if(S.mode==='wrong')renderWrongBook();if(S.mode==='stats')renderStats();if(S.mode==='exam'){if(S.exam.active){document.getElementById('examSetup').classList.add('hidden');document.getElementById('examRunning').classList.remove('hidden');document.getElementById('examResult').classList.add('hidden');renderExamQuestion();}else{resetExam();}}}
-function renderPractice(){const qs=S.filtered;if(!qs.length){document.getElementById('questionContent').innerHTML='<div style=\"text-align:center;padding:40px;color:var(--text2)\">'+(catsPending()?'⏳ 题库加载中，请稍候…':'😕 没有找到匹配的题目，请调整筛选条件')+'</div>';document.getElementById('questionNav').innerHTML='';document.getElementById('submitBtn').classList.add('hidden');document.getElementById('nextBtn').disabled=true;document.getElementById('prevBtn').disabled=true;return;}const idx=Math.min(S.currentIdx,qs.length-1);const q=qs[idx];const qKey=QK(q);const prevResult=S.questionHistory[qKey];const typeClass=TC(q);let html='<div class=\"question-stem\"><span class=\"q-num\">#'+(idx+1)+'/'+qs.length+'</span> <span class=\"tag tag-'+typeClass+'\">'+q.type+'题</span> <span style=\"color:var(--text2);font-size:11px\">['+q.category+']</span><br><br>'+q.stem+'</div><div id=\"optionsList\">';q.options.forEach((opt,i)=>{const letter=String.fromCharCode(65+i);let cls='option-item';if(S.selectedOpts.includes(i))cls+=' selected';if(S.answerState==='answered'){const corrects=q.answer.split('');if(corrects.includes(letter))cls+=' correct';else if(S.selectedOpts.includes(i)&&!corrects.includes(letter))cls+=' wrong';}const onclick=S.answerState!=='answered'?'onclick=\"selectOption('+i+')\"':'';html+='<div class=\"'+cls+'\" '+onclick+'><span class=\"opt-label\">'+letter+'.</span>'+opt.replace(/^[A-E][、,，]\s*/,'')+'</div>';});html+='</div>';document.getElementById('questionContent').innerHTML=html;document.getElementById('answerFeedback').innerHTML='';const sb=document.getElementById('submitBtn');sb.classList.remove('hidden');sb.disabled=S.answerState==='answered';sb.textContent=S.answerState==='answered'?'✅ 已提交':'✅ 提交答案';sb.style.opacity=S.answerState==='answered'?'0.5':'1';document.getElementById('nextBtn').disabled=S.currentIdx>=qs.length-1;document.getElementById('prevBtn').disabled=S.currentIdx<=0;const favKey=QK(q);const isFaved=!!S.favorites[favKey];document.getElementById('wrongBookBtn').textContent=isFaved?'⭐ 已收藏':'☆ 收藏';document.getElementById('wrongBookBtn').className=isFaved?'btn btn-sm btn-warning':'btn btn-sm btn-outline';if(S.answerState==='answered'){const correct=checkAnswer(q);const fbCls=correct?'correct-ans':'wrong-ans';const fbTxt=correct?'✅ 回答正确！':'❌ 回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+(q.explanation||'暂无详细解析')+'</div>';}else if(prevResult){const fbCls=prevResult==='correct'?'correct-ans':'wrong-ans';const fbTxt=prevResult==='correct'?'✅ 上次回答正确！':'❌ 上次回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+(q.explanation||'暂无详细解析')+'</div>';}renderQuestionNav();}
+const EXP_GENERIC=/^(根据建筑施工安全生产相关法律法规|该表述符合相关法律法规的规定)/;
+const EXP_TOPICS=[
+[/高处作业|临边|洞口|安全带|安全网|攀登作业|悬空作业|操作平台|交叉作业|防护栏杆/,'高处作业安全防护','《建筑施工高处作业安全技术规范》(JGJ 80)'],
+[/临时用电|漏电保护|配电箱|开关箱|TN-S|接零|接地|触电|电缆线路/,'施工现场临时用电安全','《施工现场临时用电安全技术规范》(JGJ 46)'],
+[/脚手架|扣件|立杆|水平杆|剪刀撑|连墙件|脚手板|架体/,'脚手架工程安全','《建筑施工扣件式钢管脚手架安全技术规范》(JGJ 130)'],
+[/塔式起重机|塔吊|起重机械|起重吊装|吊装作业|司索|信号工/,'建筑起重机械与吊装作业','《建筑起重机械安全监督管理规定》及《建筑机械使用安全技术规程》(JGJ 33)'],
+[/施工升降机|物料提升机|井架|龙门架/,'垂直运输机械安全','《建筑施工升降机安装、使用、拆卸安全技术规程》(JGJ 215)、《龙门架及井架物料提升机安全技术规范》(JGJ 88)'],
+[/基坑|土方开挖|边坡|支护结构|降水|坍塌/,'基坑与土方工程安全','《建筑基坑支护技术规程》(JGJ 120)等基坑工程安全技术规范'],
+[/模板工程|模板支撑|支模|拆模/,'模板工程安全','《建筑施工模板安全技术规范》(JGJ 162)'],
+[/消防|灭火|动火作业|易燃|可燃|防火|火灾/,'施工现场消防安全','《中华人民共和国消防法》、《建设工程施工现场消防安全技术规范》(GB 50720)'],
+[/事故报告|事故调查|较大事故|重大事故|特别重大事故|一般事故|伤亡事故|事故等级/,'生产安全事故报告与调查处理','《生产安全事故报告和调查处理条例》(国务院令第493号)'],
+[/应急预案|应急救援|应急演练|应急处置/,'应急救援与预案管理','《中华人民共和国安全生产法》及《生产安全事故应急预案管理办法》'],
+[/特种作业|持证上岗|操作资格/,'特种作业人员管理','《建筑施工特种作业人员管理规定》'],
+[/危大工程|危险性较大|专项施工方案|专家论证/,'危险性较大的分部分项工程管理','《危险性较大的分部分项工程安全管理规定》(住建部令第37号)'],
+[/安全生产许可证/,'安全生产许可管理','《安全生产许可证条例》(国务院令第397号)'],
+[/教育培训|三级安全教育|安全交底|技术交底/,'安全教育培训与技术交底','《中华人民共和国安全生产法》、《建设工程安全生产管理条例》'],
+[/职业病|职业危害|职业健康|粉尘|噪声/,'职业健康与危害防治','《中华人民共和国职业病防治法》'],
+[/工伤|劳动合同|劳动保护|工伤保险/,'劳动保护与工伤保险','《工伤保险条例》及劳动保障相关法律法规'],
+[/罚款|处罚|吊销|责令|刑事责任|法律责任/,'安全生产法律责任','《中华人民共和国安全生产法》、《建设工程安全生产管理条例》中的法律责任条款'],
+[/文明施工|扬尘|环境保护|环保/,'文明施工与环境保护','《建筑施工安全检查标准》(JGJ 59)及文明施工管理相关规定'],
+[/监理/,'工程监理安全责任','《建设工程安全生产管理条例》(国务院令第393号)'],
+[/责任制|主要负责人|专职安全|安全生产管理机构|安全员/,'安全生产责任制与管理机构','《中华人民共和国安全生产法》、《建设工程安全生产管理条例》'],
+[/安全检查|隐患排查|事故隐患/,'安全检查与隐患排查治理','《中华人民共和国安全生产法》、《建筑施工安全检查标准》(JGJ 59)'],
+];
+const EXP_FALLBACK='《中华人民共和国安全生产法》、《建设工程安全生产管理条例》(国务院令第393号)及配套工程建设标准';
+function expTopic(q){for(const[re,t,reg]of EXP_TOPICS){if(re.test(q.stem))return{t:t,reg:reg};}return{t:'建筑施工安全生产综合管理',reg:EXP_FALLBACK};}
+function optText(opt){return(opt||'').replace(/^[A-E][、,，.．]\s*/,'');}
+function buildExplanation(q){
+const tp=expTopic(q);
+const neg=/不属于|不正确|不符合|错误的|不包括|不应当|不得作为/.test(q.stem);
+const hasNum=/\d+\s*(人|米|m|mm|cm|天|日|小时|h|%|‰|元|万元|kg|t|级|年|次|倍|层|℃|kN|kPa|Ω|V|A)/i.test(q.stem+q.options.join(''));
+let body='';
+if(q.type==='判断'){
+if(q.answer==='A')body='题干表述与现行法律法规及工程建设技术规范的要求一致，应判断为<b>正确</b>。此类命题多取自规范原文或其等义转述，作答时应整体把握句意，确认责任主体、行为要求与限定条件均无偏差后再行判定。';
+else body='题干表述与现行规定不符，应判断为<b>错误</b>。判断题设错通常采取改动数值界限、偷换责任主体、调换"应当/可以""不得/严禁"等程度词的手法，请对照规范原文逐项核实，切勿凭印象作答。';
+}else if(q.type==='单选'){
+const txt=optText(q.options[q.answer.charCodeAt(0)-65]);
+body=neg?'本题为否定式选择题（要求选出不符合项），正确答案为<b>'+q.answer+'</b>，即"'+txt+'"。该项与规范要求不符或不属于规定范围，其余选项均为正确表述。作答此类题目务必抓住题干中的否定词，避免惯性思维致误。'
+:'本题正确答案为<b>'+q.answer+'</b>，即"'+txt+'"。该选项准确、完整地对应了法规及规范的规定；其余干扰项或表述片面、或数值界限有误、或责任主体错位，均不符合题意，应注意甄别。';
+}else{
+const letters=q.answer.split('').join('、');
+body=neg?'本题为否定式多项选择题，正确答案为<b>'+letters+'</b>，所选各项均不符合规范要求或不属于规定范围，其余选项为正确表述。'
+:'本题正确答案为<b>'+letters+'</b>。上述各项均属于法规及规范明确规定的内容；未入选项或与本考点无关、或表述存在偏差。多选题漏选、错选均不得分，应逐项与规范要求比对后再确定。';
+}
+const tips=[];
+if(hasNum)tips.push('本题涉及具体数量界限（人数、距离、时限、金额、层高等），此类考点历来是命题"改数设错"的高发区，务必以规范原文数值为准记忆');
+if(/建设单位|施工单位|监理单位|总承包|分包|勘察单位|设计单位/.test(q.stem))tips.push('注意区分建设、勘察、设计、施工、监理等各方责任主体的职责边界，命题常将一方职责"移花接木"至另一方');
+if(/立即|及时报告|\d+\s*小时内|\d+\s*日内|当日/.test(q.stem))tips.push('注意报告、处置、备案等程序性时限要求，时限类数字须精确记忆');
+if(/严禁|不得|禁止/.test(q.stem))tips.push('禁止性条款属于强制性规定，表述具有绝对性，不存在变通空间');
+if(!tips.length)tips.push('建议将本题加入收藏或错题本，结合同考点题目对比练习，强化对规范原文的记忆');
+let html='<b>【考点定位】</b>'+q.category+' · '+tp.t+'<br><b>【答案解析】</b>'+body+'<br><b>【法规依据】</b>本考点主要依据'+tp.reg+'的相关规定设置。';
+const orig=(q.explanation||'').trim();
+if(orig&&!EXP_GENERIC.test(orig))html+='<br><b>【要点提示】</b>'+orig;
+html+='<br><b>【易错提醒】</b>'+tips.join('；')+'。';
+return html;
+}
+function renderPractice(){const qs=S.filtered;if(!qs.length){document.getElementById('questionContent').innerHTML='<div style=\"text-align:center;padding:40px;color:var(--text2)\">'+(catsPending()?'⏳ 题库加载中，请稍候…':'😕 没有找到匹配的题目，请调整筛选条件')+'</div>';document.getElementById('questionNav').innerHTML='';document.getElementById('submitBtn').classList.add('hidden');document.getElementById('nextBtn').disabled=true;document.getElementById('prevBtn').disabled=true;return;}const idx=Math.min(S.currentIdx,qs.length-1);const q=qs[idx];const qKey=QK(q);const prevResult=S.questionHistory[qKey];const typeClass=TC(q);let html='<div class=\"question-stem\"><span class=\"q-num\">#'+(idx+1)+'/'+qs.length+'</span> <span class=\"tag tag-'+typeClass+'\">'+q.type+'题</span> <span style=\"color:var(--text2);font-size:11px\">['+q.category+']</span><br><br>'+q.stem+'</div><div id=\"optionsList\">';q.options.forEach((opt,i)=>{const letter=String.fromCharCode(65+i);let cls='option-item';if(S.selectedOpts.includes(i))cls+=' selected';if(S.answerState==='answered'){const corrects=q.answer.split('');if(corrects.includes(letter))cls+=' correct';else if(S.selectedOpts.includes(i)&&!corrects.includes(letter))cls+=' wrong';}const onclick=S.answerState!=='answered'?'onclick=\"selectOption('+i+')\"':'';html+='<div class=\"'+cls+'\" '+onclick+'><span class=\"opt-label\">'+letter+'.</span>'+opt.replace(/^[A-E][、,，]\s*/,'')+'</div>';});html+='</div>';document.getElementById('questionContent').innerHTML=html;document.getElementById('answerFeedback').innerHTML='';const sb=document.getElementById('submitBtn');sb.classList.remove('hidden');sb.disabled=S.answerState==='answered';sb.textContent=S.answerState==='answered'?'✅ 已提交':'✅ 提交答案';sb.style.opacity=S.answerState==='answered'?'0.5':'1';document.getElementById('nextBtn').disabled=S.currentIdx>=qs.length-1;document.getElementById('prevBtn').disabled=S.currentIdx<=0;const favKey=QK(q);const isFaved=!!S.favorites[favKey];document.getElementById('wrongBookBtn').textContent=isFaved?'⭐ 已收藏':'☆ 收藏';document.getElementById('wrongBookBtn').className=isFaved?'btn btn-sm btn-warning':'btn btn-sm btn-outline';if(S.answerState==='answered'){const correct=checkAnswer(q);const fbCls=correct?'correct-ans':'wrong-ans';const fbTxt=correct?'✅ 回答正确！':'❌ 回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+buildExplanation(q)+'</div>';}else if(prevResult){const fbCls=prevResult==='correct'?'correct-ans':'wrong-ans';const fbTxt=prevResult==='correct'?'✅ 上次回答正确！':'❌ 上次回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+buildExplanation(q)+'</div>';}renderQuestionNav();}
 function selectOption(idx){const q=S.filtered[S.currentIdx];if(q.type==='单选'||q.type==='判断')S.selectedOpts=[idx];else if(q.type==='多选'){const ei=S.selectedOpts.indexOf(idx);if(ei>=0)S.selectedOpts.splice(ei,1);else S.selectedOpts.push(idx);}renderPractice();}
 function submitAnswer(){if(!S.selectedOpts.length)return;S.answerState='answered';const q=S.filtered[S.currentIdx];const qKey=QK(q);const ua=S.selectedOpts.map(i=>String.fromCharCode(65+i)).sort().join('');const correct=ua===q.answer;S.questionHistory[qKey]=correct?'correct':'wrong';saveQuestionHistory();const cat=q.category.replace('类','');if(!S.progress[cat])S.progress[cat]={total:0,correct:0,byType:{}};S.progress[cat].total++;if(correct)S.progress[cat].correct++;if(!S.progress[cat].byType[q.type])S.progress[cat].byType[q.type]={total:0,correct:0};S.progress[cat].byType[q.type].total++;if(correct)S.progress[cat].byType[q.type].correct++;saveProgress();if(!correct){S.wrongBook[qKey]={...q,wc:(S.wrongBook[qKey]?.wc||0)+1,lw:Date.now()};saveWrongBook();}else if(S.wrongBook[qKey]){delete S.wrongBook[qKey];saveWrongBook();}renderPractice();updateMiniStats();}
 function nextQuestion(){if(S.currentIdx<S.filtered.length-1){S.currentIdx++;RS();renderPractice();}}
