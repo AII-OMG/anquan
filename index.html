@@ -333,7 +333,8 @@ let ALL_QUESTIONS=[];
 const CAT_LIST=['A','B','C1','C2','C3'];
 const catPromises={};
 let loadFailed=false;
-function loadCat(cat){if(catPromises[cat])return catPromises[cat];catPromises[cat]=fetch('questions_'+cat+'.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();}).then(qs=>{if(!Array.isArray(qs))throw new Error('bad data');window['QUESTIONS_'+cat]=qs;ALL_QUESTIONS.push(...qs);return cat;}).catch(err=>{delete catPromises[cat];throw err;});return catPromises[cat];}
+const QDATA_VER='2';
+function loadCat(cat){if(catPromises[cat])return catPromises[cat];catPromises[cat]=fetch('questions_'+cat+'.json?v='+QDATA_VER).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();}).then(qs=>{if(!Array.isArray(qs))throw new Error('bad data');window['QUESTIONS_'+cat]=qs;ALL_QUESTIONS.push(...qs);return cat;}).catch(err=>{delete catPromises[cat];throw err;});return catPromises[cat];}
 function neededCats(cat){return cat==='ALL'?CAT_LIST:[cat];}
 function catsPending(){return neededCats(S.category).some(c=>!window['QUESTIONS_'+c]);}
 function refreshLoadBanner(){const banner=document.getElementById('loadBanner');const need=neededCats(S.category);const pending=need.filter(c=>!window['QUESTIONS_'+c]);if(loadFailed){banner.classList.remove('hidden');banner.classList.add('error');document.getElementById('loadBannerText').textContent='⚠️ 部分题库加载失败，点击此处重试';return;}if(!pending.length){banner.classList.add('hidden');return;}banner.classList.remove('hidden');banner.classList.remove('error');const done=need.length-pending.length;document.getElementById('loadBannerText').textContent=need.length>1?('题库加载中 '+done+'/'+need.length+'，已加载部分可直接刷题'):'题库加载中，请稍候…';}
@@ -355,80 +356,7 @@ function updateMiniStats(){const t=S.filtered.length;const cat=S.category==='ALL
 function switchCategory(cat){S.category=cat;localStorage.setItem('hnsafety_cat',cat);document.querySelectorAll('#categoryTabs .nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.cat===cat));startCatLoads(cat);applyFilters();S.currentIdx=0;RS();renderCurrentMode();}
 function switchMode(mode){S.mode=mode;document.querySelectorAll('#modeTabs .nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===mode));document.getElementById('practiceView').classList.toggle('hidden',mode!=='practice');document.getElementById('examView').classList.toggle('hidden',mode!=='exam');document.getElementById('favView').classList.toggle('hidden',mode!=='fav');document.getElementById('wrongView').classList.toggle('hidden',mode!=='wrong');document.getElementById('statsView').classList.toggle('hidden',mode!=='stats');renderCurrentMode();}
 function renderCurrentMode(){if(S.mode==='practice')renderPractice();if(S.mode==='fav')renderFavorites();if(S.mode==='wrong')renderWrongBook();if(S.mode==='stats')renderStats();if(S.mode==='exam'){if(S.exam.active){document.getElementById('examSetup').classList.add('hidden');document.getElementById('examRunning').classList.remove('hidden');document.getElementById('examResult').classList.add('hidden');renderExamQuestion();}else{resetExam();}}}
-const EXP_GENERIC=/^(根据建筑施工安全生产相关法律法规|该表述符合相关法律法规的规定)/;
-const EXP_TOPICS=[
-[/高处作业|临边|洞口|安全带|安全网|攀登作业|悬空作业|操作平台|交叉作业|防护栏杆/,'高处作业安全防护','《建筑施工高处作业安全技术规范》(JGJ 80)','高处作业防的就是坠落：2m 以上就算高处作业，临边、洞口必须有防护，安全带高挂低用'],
-[/临时用电|漏电保护|配电箱|开关箱|TN-S|接零|接地|触电|电缆线路/,'施工现场临时用电安全','《施工现场临时用电安全技术规范》(JGJ 46)','施工用电三件套：TN-S 三相五线、三级配电、两级漏保，开关箱"一机一闸一漏一箱"'],
-[/脚手架|扣件|立杆|水平杆|剪刀撑|连墙件|脚手板|架体/,'脚手架工程安全','《建筑施工扣件式钢管脚手架安全技术规范》(JGJ 130)','脚手架考点集中在杆件间距、扫地杆、连墙件和分段验收，数字多但翻来覆去就那几个'],
-[/塔式起重机|塔吊|起重机械|起重吊装|吊装作业|司索|信号工/,'建筑起重机械与吊装作业','《建筑起重机械安全监督管理规定》及《建筑机械使用安全技术规程》(JGJ 33)','起重机械一条线：安装告知→检测→验收→登记→使用，安拆必须找有资质的队伍'],
-[/施工升降机|物料提升机|井架|龙门架/,'垂直运输机械安全','施工升降机、物料提升机安全技术规程(JGJ 215、JGJ 88)','施工升降机安拆要专项方案，装完验收合格、登记后才能用'],
-[/基坑|土方开挖|边坡|支护结构|降水|坍塌/,'基坑与土方工程安全','《建筑基坑支护技术规程》(JGJ 120)等基坑工程安全技术规范','基坑挖 3m 以上要编专项方案，5m 以上还要专家论证，坑边堆载和放坡是常考细节'],
-[/模板工程|模板支撑|支模|拆模/,'模板工程安全','《建筑施工模板安全技术规范》(JGJ 162)','模板支撑是坍塌高发区：搭设按方案来，拆模要等强度报告，后支的先拆'],
-[/消防|灭火|动火作业|易燃|可燃|防火|火灾/,'施工现场消防安全','《消防法》、《建设工程施工现场消防安全技术规范》(GB 50720)','现场消防三板斧：动火要审批、灭火器材按规定配、消防通道保持畅通'],
-[/事故报告|事故调查|较大事故|重大事故|特别重大事故|一般事故|伤亡事故|事故等级/,'生产安全事故报告与调查处理','《生产安全事故报告和调查处理条例》(国务院令第493号)','事故分四级：一般、较大、重大、特别重大；单位负责人接报后 1 小时内上报，紧急时可越级'],
-[/应急预案|应急救援|应急演练|应急处置/,'应急救援与预案管理','《安全生产法》及《生产安全事故应急预案管理办法》','应急预案要备案更要练：综合或专项预案每年至少演练一次，现场处置方案半年一次'],
-[/特种作业|持证上岗|操作资格/,'特种作业人员管理','《建筑施工特种作业人员管理规定》','特种作业先考证、持证上岗，证书按期复审，无证作业人和单位都要担责'],
-[/危大工程|危险性较大|专项施工方案|专家论证/,'危险性较大的分部分项工程管理','《危险性较大的分部分项工程安全管理规定》(住建部令第37号)','危大工程编专项方案，超规模的开专家论证会，方案没批不准开工'],
-[/安全生产许可证/,'安全生产许可管理','《安全生产许可证条例》(国务院令第397号)','安全生产许可证有效期 3 年，期满前 3 个月申请延期，无证不得施工'],
-[/教育培训|三级安全教育|安全交底|技术交底/,'安全教育培训与技术交底','《安全生产法》、《建设工程安全生产管理条例》','新工人三级安全教育：公司级→项目级→班组级，换工种、复工都要重新教育'],
-[/职业病|职业危害|职业健康|粉尘|噪声/,'职业健康与危害防治','《职业病防治法》','职业病防护讲"三同时"：防护设施与主体工程同时设计、同时施工、同时投入使用'],
-[/工伤|劳动合同|劳动保护|工伤保险/,'劳动保护与工伤保险','《工伤保险条例》及劳动保障相关法律法规','工伤保险由单位缴费、个人不掏钱，认定时限和待遇标准是常考点'],
-[/罚款|处罚|吊销|责令|刑事责任|法律责任/,'安全生产法律责任','《安全生产法》、《建设工程安全生产管理条例》中的法律责任条款','罚则题抓两个数：罚款档次和吊证情形，数额对号入座就能拿分'],
-[/文明施工|扬尘|环境保护|环保/,'文明施工与环境保护','《建筑施工安全检查标准》(JGJ 59)及文明施工管理相关规定','文明施工看五样：围挡、扬尘控制、材料码放、安全标牌、场容场貌'],
-[/监理/,'工程监理安全责任','《建设工程安全生产管理条例》(国务院令第393号)','监理三步曲：发现隐患要求整改→情况严重下停工令→拒不整改报主管部门'],
-[/责任制|主要负责人|专职安全|安全生产管理机构|安全员/,'安全生产责任制与管理机构','《安全生产法》、《建设工程安全生产管理条例》','主要负责人是本单位安全第一责任人，专职安全员按工程规模配备'],
-[/安全检查|隐患排查|事故隐患/,'安全检查与隐患排查治理','《安全生产法》、《建筑施工安全检查标准》(JGJ 59)','隐患排查要闭环：检查→记录→整改→复查，缺一环都不算完'],
-];
-const EXP_FALLBACK='《安全生产法》、《建设工程安全生产管理条例》(国务院令第393号)及配套工程建设标准';
-function expTopic(q){for(const[re,t,reg,hint]of EXP_TOPICS){if(re.test(q.stem))return{t:t,reg:reg,hint:hint};}return{t:'建筑施工安全生产综合管理',reg:EXP_FALLBACK,hint:''};}
-function optText(opt){return(opt||'').replace(/^[A-E][、,，.．]\s*/,'');}
-function pick(arr,seed){return arr[seed%arr.length];}
-function buildExplanation(q){
-const tp=expTopic(q);
-const stem=q.stem;
-const neg=/不属于|不正确|不符合|错误的|不包括|不应当|不得作为/.test(stem);
-const seed=stem.length+stem.charCodeAt(0)+stem.charCodeAt(stem.length-1)+stem.charCodeAt(stem.length>>1);
-const nums=(stem.match(/\d+(?:\.\d+)?\s*(?:人|米|mm|cm|m|天|日|小时|%|‰|万元|元|kg|t|级|年|次|倍|层|℃)/g)||[]).slice(0,3);
-const numStr=nums.join('、');
-let numUsed=false;
-let body='';
-if(q.type==='判断'){
-if(q.answer==='A'){
-if(nums.length){numUsed=true;body=pick(['说法<b>正确</b>，题干里的「'+numStr+'」正是规范定的数，这题考的就是这个数字，记牢它。','<b>正确</b>。「'+numStr+'」这个数值和规范原文一致——数字就是本题考点。','这句话<b>没错</b>，重点记「'+numStr+'」，下次见到改了数的版本要能认出来。'],seed);}
-else body=pick(['说法<b>正确</b>，题干就是规范原文的意思，按原话记住就行。','<b>正确</b>。题干和规范要求完全一致，放心记。','这句话是<b>对的</b>，可以直接当结论背。','<b>正确</b>，这就是规范的要求，考试常按原文出题。','说法<b>没问题</b>，与现行规定相符，见到类似表述直接判对。'],seed);
-}else{
-if(nums.length){numUsed=true;body=pick(['<b>错误</b>。先盯住「'+numStr+'」核对——判断题十有八九是把数字改了。','这句话是<b>错的</b>，大概率就错在「'+numStr+'」这类数值或"应当/可以"的字眼上。','判<b>错</b>。带数字的判断题先怀疑数字：「'+numStr+'」很可能不是规范原文的数。'],seed);}
-else body=pick(['说法<b>错误</b>，题干在规范原话上动了手脚，和原文对不上。','<b>错误</b>。这句话读着顺口，其实和规定不一致，别凭感觉判断。','这句话是<b>错的</b>，和现行规定不符。','<b>错误</b>。题干看着像那么回事，细究起来和规范要求有出入。','判<b>错</b>。这类题就是把正确说法改一两个词来挖坑，多留个心眼。'],seed);
-}
-}else if(q.type==='单选'){
-const ci=q.answer.charCodeAt(0)-65;
-const txt=optText(q.options[ci]);
-const others=q.options.map((o,i)=>i===ci?null:optText(o)).filter(Boolean);
-const shortOpts=others.length&&others.every(o=>o.length<=10);
-if(neg)body=pick(['注意本题是选"错误项"：<b>'+q.answer+'</b>（'+txt+'）不符合规定，其余选项反而都是对的。','这题是反着问的，要挑出错误的一项：<b>'+q.answer+'</b>（'+txt+'）与规定不符，正是要选的。','看清题干里的"不"字——<b>'+q.answer+'</b>（'+txt+'）是唯一不符合规定的选项。','反向题：其他选项都对，就 <b>'+q.answer+'</b>（'+txt+'）不合规，选它。'],seed);
-else if(shortOpts)body=pick(['正确答案 <b>'+q.answer+'</b>：'+txt+'。其余的「'+others.join('」「')+'」都是凑数的干扰项。','选 <b>'+q.answer+'</b>（'+txt+'）。「'+others.join('」「')+'」看着眼熟，但都不是规范定的那个。','答案 <b>'+q.answer+'</b>：'+txt+'。出题人拿「'+others.join('」「')+'」混淆视听，别上当。'],seed);
-else body=pick(['正确答案是 <b>'+q.answer+'</b>：'+txt+'。','选 <b>'+q.answer+'</b>——'+txt+'，这是规范的标准说法。','答案 <b>'+q.answer+'</b>（'+txt+'），其余选项都有毛病，别被绕进去。','本题选 <b>'+q.answer+'</b>：'+txt+'。把它和题干连起来读一遍，就是完整的规范要求。','<b>'+q.answer+'</b> 正确——'+txt+'。记住这个组合，同类题换着花样考。'],seed);
-}else{
-const letters=q.answer.split('').join('、');
-const corrects=q.answer.split('').map(L=>({L:L,t:optText(q.options[L.charCodeAt(0)-65])}));
-const canList=corrects.length<=4&&corrects.every(c=>c.t.length<=16);
-if(neg)body=pick(['这题是反向多选：<b>'+letters+'</b> 这几项不符合规定，正是要选的，注意题干里的否定词。','反向题，挑错误项：<b>'+letters+'</b> 都与规定不符，其余选项反而是对的。'],seed);
-else if(canList)body=pick(['这几项都是规定要求：'+corrects.map(c=>c.L+'（'+c.t+'）').join('、')+'。一个都不能漏。','把「'+corrects.map(c=>c.L+'（'+c.t+'）').join('、')+'」打包记住，这就是本题的完整答案。'],seed);
-else body=pick(['正确答案：<b>'+letters+'</b>，这几项都是规范明确要求的。多选题少选、错选都不得分。','本题应选 <b>'+letters+'</b>，没选进来的选项要么和题目无关，要么说法有误。','答案是 <b>'+letters+'</b>，逐项核对再提交，别漏选。','<b>'+letters+'</b> 全对。多选题稳妥做法：把每个选项当判断题逐个判一遍。'],seed);
-}
-let html=body;
-const orig=(q.explanation||'').trim();
-if(orig&&!EXP_GENERIC.test(orig))html+='<br>'+orig;
-html+='<br><span style="color:var(--text2);font-size:13px">考点：'+tp.t+'（'+tp.reg+'）</span>';
-const tips=[];
-if(tp.hint)tips.push(tp.hint);
-if(nums.length&&!numUsed)tips.push(pick(['带数字的题最爱改数设错，把规范原文的数记死。','数字考点重复率高，今天记住这个数，考场直接拿分。'],seed));
-if(/建设单位|施工单位|监理单位|总承包|分包|勘察单位|设计单位/.test(stem))tips.push(pick(['建设、施工、监理各管一摊，考题最爱张冠李戴，看清主语再判断。','职责类题先看主语是谁——主体一换，对错就反转。'],seed));
-if(/立即|及时报告|\d+\s*小时内|\d+\s*日内|当日/.test(stem))tips.push('"几小时内、几日内"这类时限必须记精确，模糊记忆等于没记。');
-if(tips.length)html+='<br><span style="font-size:13px">💡 '+pick(tips,Math.floor(seed/3))+'</span>';
-return html;
-}
-function renderPractice(){const qs=S.filtered;if(!qs.length){document.getElementById('questionContent').innerHTML='<div style=\"text-align:center;padding:40px;color:var(--text2)\">'+(catsPending()?'⏳ 题库加载中，请稍候…':'😕 没有找到匹配的题目，请调整筛选条件')+'</div>';document.getElementById('questionNav').innerHTML='';document.getElementById('submitBtn').classList.add('hidden');document.getElementById('nextBtn').disabled=true;document.getElementById('prevBtn').disabled=true;return;}const idx=Math.min(S.currentIdx,qs.length-1);const q=qs[idx];const qKey=QK(q);const prevResult=S.questionHistory[qKey];const typeClass=TC(q);let html='<div class=\"question-stem\"><span class=\"q-num\">#'+(idx+1)+'/'+qs.length+'</span> <span class=\"tag tag-'+typeClass+'\">'+q.type+'题</span> <span style=\"color:var(--text2);font-size:11px\">['+q.category+']</span><br><br>'+q.stem+'</div><div id=\"optionsList\">';q.options.forEach((opt,i)=>{const letter=String.fromCharCode(65+i);let cls='option-item';if(S.selectedOpts.includes(i))cls+=' selected';if(S.answerState==='answered'){const corrects=q.answer.split('');if(corrects.includes(letter))cls+=' correct';else if(S.selectedOpts.includes(i)&&!corrects.includes(letter))cls+=' wrong';}const onclick=S.answerState!=='answered'?'onclick=\"selectOption('+i+')\"':'';html+='<div class=\"'+cls+'\" '+onclick+'><span class=\"opt-label\">'+letter+'.</span>'+opt.replace(/^[A-E][、,，]\s*/,'')+'</div>';});html+='</div>';document.getElementById('questionContent').innerHTML=html;document.getElementById('answerFeedback').innerHTML='';const sb=document.getElementById('submitBtn');sb.classList.remove('hidden');sb.disabled=S.answerState==='answered';sb.textContent=S.answerState==='answered'?'✅ 已提交':'✅ 提交答案';sb.style.opacity=S.answerState==='answered'?'0.5':'1';document.getElementById('nextBtn').disabled=S.currentIdx>=qs.length-1;document.getElementById('prevBtn').disabled=S.currentIdx<=0;const favKey=QK(q);const isFaved=!!S.favorites[favKey];document.getElementById('wrongBookBtn').textContent=isFaved?'⭐ 已收藏':'☆ 收藏';document.getElementById('wrongBookBtn').className=isFaved?'btn btn-sm btn-warning':'btn btn-sm btn-outline';if(S.answerState==='answered'){const correct=checkAnswer(q);const fbCls=correct?'correct-ans':'wrong-ans';const fbTxt=correct?'✅ 回答正确！':'❌ 回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+buildExplanation(q)+'</div>';}else if(prevResult){const fbCls=prevResult==='correct'?'correct-ans':'wrong-ans';const fbTxt=prevResult==='correct'?'✅ 上次回答正确！':'❌ 上次回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+buildExplanation(q)+'</div>';}renderQuestionNav();}
+function renderPractice(){const qs=S.filtered;if(!qs.length){document.getElementById('questionContent').innerHTML='<div style=\"text-align:center;padding:40px;color:var(--text2)\">'+(catsPending()?'⏳ 题库加载中，请稍候…':'😕 没有找到匹配的题目，请调整筛选条件')+'</div>';document.getElementById('questionNav').innerHTML='';document.getElementById('submitBtn').classList.add('hidden');document.getElementById('nextBtn').disabled=true;document.getElementById('prevBtn').disabled=true;return;}const idx=Math.min(S.currentIdx,qs.length-1);const q=qs[idx];const qKey=QK(q);const prevResult=S.questionHistory[qKey];const typeClass=TC(q);let html='<div class=\"question-stem\"><span class=\"q-num\">#'+(idx+1)+'/'+qs.length+'</span> <span class=\"tag tag-'+typeClass+'\">'+q.type+'题</span> <span style=\"color:var(--text2);font-size:11px\">['+q.category+']</span><br><br>'+q.stem+'</div><div id=\"optionsList\">';q.options.forEach((opt,i)=>{const letter=String.fromCharCode(65+i);let cls='option-item';if(S.selectedOpts.includes(i))cls+=' selected';if(S.answerState==='answered'){const corrects=q.answer.split('');if(corrects.includes(letter))cls+=' correct';else if(S.selectedOpts.includes(i)&&!corrects.includes(letter))cls+=' wrong';}const onclick=S.answerState!=='answered'?'onclick=\"selectOption('+i+')\"':'';html+='<div class=\"'+cls+'\" '+onclick+'><span class=\"opt-label\">'+letter+'.</span>'+opt.replace(/^[A-E][、,，]\s*/,'')+'</div>';});html+='</div>';document.getElementById('questionContent').innerHTML=html;document.getElementById('answerFeedback').innerHTML='';const sb=document.getElementById('submitBtn');sb.classList.remove('hidden');sb.disabled=S.answerState==='answered';sb.textContent=S.answerState==='answered'?'✅ 已提交':'✅ 提交答案';sb.style.opacity=S.answerState==='answered'?'0.5':'1';document.getElementById('nextBtn').disabled=S.currentIdx>=qs.length-1;document.getElementById('prevBtn').disabled=S.currentIdx<=0;const favKey=QK(q);const isFaved=!!S.favorites[favKey];document.getElementById('wrongBookBtn').textContent=isFaved?'⭐ 已收藏':'☆ 收藏';document.getElementById('wrongBookBtn').className=isFaved?'btn btn-sm btn-warning':'btn btn-sm btn-outline';if(S.answerState==='answered'){const correct=checkAnswer(q);const fbCls=correct?'correct-ans':'wrong-ans';const fbTxt=correct?'✅ 回答正确！':'❌ 回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+(q.explanation||'暂无解析')+'</div>';}else if(prevResult){const fbCls=prevResult==='correct'?'correct-ans':'wrong-ans';const fbTxt=prevResult==='correct'?'✅ 上次回答正确！':'❌ 上次回答错误';document.getElementById('answerFeedback').innerHTML='<div class=\"answer-display '+fbCls+'\">'+fbTxt+' 正确答案：<b>'+q.answer+'</b></div><div class=\"explanation-box\"><div class=\"exp-title\">📖 解析</div>'+(q.explanation||'暂无解析')+'</div>';}renderQuestionNav();}
 function selectOption(idx){const q=S.filtered[S.currentIdx];if(q.type==='单选'||q.type==='判断')S.selectedOpts=[idx];else if(q.type==='多选'){const ei=S.selectedOpts.indexOf(idx);if(ei>=0)S.selectedOpts.splice(ei,1);else S.selectedOpts.push(idx);}renderPractice();}
 function submitAnswer(){if(!S.selectedOpts.length)return;S.answerState='answered';const q=S.filtered[S.currentIdx];const qKey=QK(q);const ua=S.selectedOpts.map(i=>String.fromCharCode(65+i)).sort().join('');const correct=ua===q.answer;S.questionHistory[qKey]=correct?'correct':'wrong';saveQuestionHistory();const cat=q.category.replace('类','');if(!S.progress[cat])S.progress[cat]={total:0,correct:0,byType:{}};S.progress[cat].total++;if(correct)S.progress[cat].correct++;if(!S.progress[cat].byType[q.type])S.progress[cat].byType[q.type]={total:0,correct:0};S.progress[cat].byType[q.type].total++;if(correct)S.progress[cat].byType[q.type].correct++;saveProgress();if(!correct){S.wrongBook[qKey]={...q,wc:(S.wrongBook[qKey]?.wc||0)+1,lw:Date.now()};saveWrongBook();}else if(S.wrongBook[qKey]){delete S.wrongBook[qKey];saveWrongBook();}renderPractice();updateMiniStats();}
 function nextQuestion(){if(S.currentIdx<S.filtered.length-1){S.currentIdx++;RS();renderPractice();}}

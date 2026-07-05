@@ -35,7 +35,7 @@ self.addEventListener('fetch', e => {
 
   // 题库JSON: 缓存优先立即返回, 同时后台拉新版本更新缓存
   if (url.pathname.endsWith('.json')) {
-    const refresh = fetch(e.request).then(res => {
+    const refresh = fetch(e.request, { cache: 'no-cache' }).then(res => {
       if (!res.ok) return res;
       const copy = res.clone();
       return caches.open(CACHE).then(c => c.put(e.request, copy)).then(() => res);
